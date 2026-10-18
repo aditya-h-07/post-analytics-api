@@ -16,7 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_KEY = os.environ.get("API_KEY", "")
+# Use the assigned key as the fallback if Render's API_KEY
+# environment variable has not been configured.
+ASSIGNED_API_KEY = "ak_qf956rousyn52mvhv2yvpqam"
+API_KEY = os.environ.get("API_KEY", ASSIGNED_API_KEY).strip()
+
 EMAIL = "23f2004697@ds.study.iitm.ac.in"
 
 
@@ -35,16 +39,18 @@ def analytics(
     body: AnalyticsRequest,
     x_api_key: str = Header(default=None, alias="X-API-Key"),
 ):
-    if not API_KEY or x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    if x_api_key is None or x_api_key != API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+        )
 
-    events = body.events
     positive_totals = defaultdict(float)
-    users = set()
+    unique_users = set()
     revenue = 0.0
 
-    for event in events:
-        users.add(event.user)
+    for event in body.events:
+        unique_users.add(event.user)
 
         if event.amount > 0:
             revenue += event.amount
@@ -58,8 +64,8 @@ def analytics(
 
     return {
         "email": EMAIL,
-        "total_events": len(events),
-        "unique_users": len(users),
+        "total_events": len(body.events),
+        "unique_users": len(unique_users),
         "revenue": round(revenue, 2),
         "top_user": top_user,
     }
